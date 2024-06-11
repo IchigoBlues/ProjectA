@@ -113,20 +113,18 @@ function registerHighGeneric(context, genericDetails) {
 
     if ( css.length === 0 ) { return; }
 
-    const { none, basic, optimal, complete } = filteringModeDetails;
+    const { none, optimal } = filteringModeDetails;
     const matches = [];
     const excludeMatches = [];
-    if ( complete.has('all-urls') ) {
+    if ( optimal.has('all-urls') ) {
         excludeMatches.push(...ut.matchesFromHostnames(none));
-        excludeMatches.push(...ut.matchesFromHostnames(basic));
-        excludeMatches.push(...ut.matchesFromHostnames(optimal));
         excludeMatches.push(...ut.matchesFromHostnames(excludeHostnames));
         matches.push('<all_urls>');
     } else {
         matches.push(
             ...ut.matchesFromHostnames(
                 ut.subtractHostnameIters(
-                    Array.from(complete),
+                    Array.from(optimal),
                     excludeHostnames
                 )
             )
@@ -187,20 +185,18 @@ function registerGeneric(context, genericDetails) {
 
     js.push('/js/scripting/css-generic.js');
 
-    const { none, basic, optimal, complete } = filteringModeDetails;
+    const { none, optimal} = filteringModeDetails;
     const matches = [];
     const excludeMatches = [];
-    if ( complete.has('all-urls') ) {
+    if ( optimal.has('all-urls') ) {
         excludeMatches.push(...ut.matchesFromHostnames(none));
-        excludeMatches.push(...ut.matchesFromHostnames(basic));
-        excludeMatches.push(...ut.matchesFromHostnames(optimal));
         excludeMatches.push(...ut.matchesFromHostnames(excludeHostnames));
         matches.push('<all_urls>');
     } else {
         matches.push(
             ...ut.matchesFromHostnames(
                 ut.subtractHostnameIters(
-                    Array.from(complete),
+                    Array.from(optimal),
                     excludeHostnames
                 )
             )
@@ -250,10 +246,9 @@ function registerProcedural(context) {
     }
     if ( js.length === 0 ) { return; }
 
-    const { none, basic, optimal, complete } = filteringModeDetails;
+    const { none, optimal} = filteringModeDetails;
     const matches = [
-        ...ut.matchesFromHostnames(optimal),
-        ...ut.matchesFromHostnames(complete),
+        ...ut.matchesFromHostnames(optimal)
     ];
     if ( matches.length === 0 ) { return; }
 
@@ -263,9 +258,7 @@ function registerProcedural(context) {
     if ( none.has('all-urls') === false ) {
         excludeMatches.push(...ut.matchesFromHostnames(none));
     }
-    if ( basic.has('all-urls') === false ) {
-        excludeMatches.push(...ut.matchesFromHostnames(basic));
-    }
+
 
     const registered = before.get('css-procedural');
     before.delete('css-procedural'); // Important!
@@ -309,10 +302,9 @@ function registerDeclarative(context) {
     }
     if ( js.length === 0 ) { return; }
 
-    const { none, basic, optimal, complete } = filteringModeDetails;
+    const { none, optimal } = filteringModeDetails;
     const matches = [
         ...ut.matchesFromHostnames(optimal),
-        ...ut.matchesFromHostnames(complete),
     ];
     if ( matches.length === 0 ) { return; }
 
@@ -322,9 +314,7 @@ function registerDeclarative(context) {
     if ( none.has('all-urls') === false ) {
         excludeMatches.push(...ut.matchesFromHostnames(none));
     }
-    if ( basic.has('all-urls') === false ) {
-        excludeMatches.push(...ut.matchesFromHostnames(basic));
-    }
+ 
 
     const registered = before.get('css-declarative');
     before.delete('css-declarative'); // Important!
@@ -368,10 +358,9 @@ function registerSpecific(context) {
     }
     if ( js.length === 0 ) { return; }
 
-    const { none, basic, optimal, complete } = filteringModeDetails;
+    const { none, optimal } = filteringModeDetails;
     const matches = [
         ...ut.matchesFromHostnames(optimal),
-        ...ut.matchesFromHostnames(complete),
     ];
     if ( matches.length === 0 ) { return; }
 
@@ -381,9 +370,7 @@ function registerSpecific(context) {
     if ( none.has('all-urls') === false ) {
         excludeMatches.push(...ut.matchesFromHostnames(none));
     }
-    if ( basic.has('all-urls') === false ) {
-        excludeMatches.push(...ut.matchesFromHostnames(basic));
-    }
+
 
     const registered = before.get('css-specific');
     before.delete('css-specific'); // Important!
@@ -420,16 +407,13 @@ function registerScriptlet(context, scriptletDetails) {
     const { before, filteringModeDetails, rulesetsDetails } = context;
 
     const hasBroadHostPermission =
-        filteringModeDetails.optimal.has('all-urls') ||
-        filteringModeDetails.complete.has('all-urls');
+        filteringModeDetails.optimal.has('all-urls');
 
     const permissionRevokedMatches = [
         ...ut.matchesFromHostnames(filteringModeDetails.none),
-        ...ut.matchesFromHostnames(filteringModeDetails.basic),
     ];
     const permissionGrantedHostnames = [
         ...filteringModeDetails.optimal,
-        ...filteringModeDetails.complete,
     ];
 
     for ( const rulesetId of rulesetsDetails.map(v => v.id) ) {

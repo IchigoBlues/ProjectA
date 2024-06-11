@@ -48,14 +48,10 @@ import {
 /******************************************************************************/
 
 // 0:       no filtering
-// 1:    basic filtering
-// 2:  optimal filtering
-// 3: complete filtering
+// 1:  optimal filtering
 
-export const     MODE_NONE = 0;
-export const    MODE_BASIC = 1;
-export const  MODE_OPTIMAL = 2;
-export const MODE_COMPLETE = 3;
+export const  MODE_NONE = 0;
+export const  MODE_OPTIMAL = 1;
 
 /******************************************************************************/
 
@@ -94,48 +90,36 @@ const eqSets = (setBefore, setAfter) => {
 const serializeModeDetails = details => {
     return {
         none: Array.from(details.none),
-        basic: Array.from(details.basic),
         optimal: Array.from(details.optimal),
-        complete: Array.from(details.complete),
     };
 };
 
 const unserializeModeDetails = details => {
     return {
         none: new Set(details.none),
-        basic: new Set(details.basic ?? details.network),
         optimal: new Set(details.optimal ?? details.extendedSpecific),
-        complete: new Set(details.complete ?? details.extendedGeneric),
     };
 };
 
 /******************************************************************************/
 
 function lookupFilteringMode(filteringModes, hostname) {
-    const { none, basic, optimal, complete } = filteringModes;
+    const { none, optimal } = filteringModes;
     if ( hostname === 'all-urls' ) {
         if ( filteringModes.none.has('all-urls') ) { return MODE_NONE; }
-        if ( filteringModes.basic.has('all-urls') ) { return MODE_BASIC; }
         if ( filteringModes.optimal.has('all-urls') ) { return MODE_OPTIMAL; }
-        if ( filteringModes.complete.has('all-urls') ) { return MODE_COMPLETE; }
-        return MODE_BASIC;
+        return MODE_NONE;
     }
     if ( none.has(hostname) ) { return MODE_NONE; }
     if ( none.has('all-urls') === false ) {
         if ( isDescendantHostnameOfIter(hostname, none) ) { return MODE_NONE; }
     }
-    if ( basic.has(hostname) ) { return MODE_BASIC; }
-    if ( basic.has('all-urls') === false ) {
-        if ( isDescendantHostnameOfIter(hostname, basic) ) { return MODE_BASIC; }
-    }
+
     if ( optimal.has(hostname) ) { return MODE_OPTIMAL; }
     if ( optimal.has('all-urls') === false ) {
         if ( isDescendantHostnameOfIter(hostname, optimal) ) { return MODE_OPTIMAL; }
     }
-    if ( complete.has(hostname) ) { return MODE_COMPLETE; }
-    if ( complete.has('all-urls') === false ) {
-        if ( isDescendantHostnameOfIter(hostname, complete) ) { return MODE_COMPLETE; }
-    }
+
     return lookupFilteringMode(filteringModes, 'all-urls');
 }
 
@@ -150,51 +134,35 @@ function applyFilteringMode(filteringModes, hostname, afterLevel) {
             filteringModes.none.clear();
             filteringModes.none.add('all-urls');
             break;
-        case MODE_BASIC:
-            filteringModes.basic.clear();
-            filteringModes.basic.add('all-urls');
-            break;
+
         case MODE_OPTIMAL:
             filteringModes.optimal.clear();
             filteringModes.optimal.add('all-urls');
             break;
-        case MODE_COMPLETE:
-            filteringModes.complete.clear();
-            filteringModes.complete.add('all-urls');
-            break;
+
         }
         switch ( defaultLevel ) {
         case MODE_NONE:
             filteringModes.none.delete('all-urls');
             break;
-        case MODE_BASIC:
-            filteringModes.basic.delete('all-urls');
-            break;
         case MODE_OPTIMAL:
             filteringModes.optimal.delete('all-urls');
             break;
-        case MODE_COMPLETE:
-            filteringModes.complete.delete('all-urls');
-            break;
+
         }
         return lookupFilteringMode(filteringModes, 'all-urls');
     }
     const beforeLevel = lookupFilteringMode(filteringModes, hostname);
     if ( afterLevel === beforeLevel ) { return afterLevel; }
-    const { none, basic, optimal, complete } = filteringModes;
+    const { none, optimal } = filteringModes;
     switch ( beforeLevel ) {
     case MODE_NONE:
         pruneHostnameFromSet(hostname, none);
         break;
-    case MODE_BASIC:
-        pruneHostnameFromSet(hostname, basic);
-        break;
     case MODE_OPTIMAL:
         pruneHostnameFromSet(hostname, optimal);
         break;
-    case MODE_COMPLETE:
-        pruneHostnameFromSet(hostname, complete);
-        break;
+
     }
     if ( afterLevel !== defaultLevel ) {
         switch ( afterLevel ) {
@@ -204,24 +172,14 @@ function applyFilteringMode(filteringModes, hostname, afterLevel) {
                 pruneDescendantHostnamesFromSet(hostname, none);
             }
             break;
-        case MODE_BASIC:
-            if ( isDescendantHostnameOfIter(hostname, basic) === false ) {
-                filteringModes.basic.add(hostname);
-                pruneDescendantHostnamesFromSet(hostname, basic);
-            }
-            break;
+
         case MODE_OPTIMAL:
             if ( isDescendantHostnameOfIter(hostname, optimal) === false ) {
                 filteringModes.optimal.add(hostname);
                 pruneDescendantHostnamesFromSet(hostname, optimal);
             }
             break;
-        case MODE_COMPLETE:
-            if ( isDescendantHostnameOfIter(hostname, complete) === false ) {
-                filteringModes.complete.add(hostname);
-                pruneDescendantHostnamesFromSet(hostname, complete);
-            }
-            break;
+
         }
     }
     return lookupFilteringMode(filteringModes, hostname);
@@ -243,7 +201,7 @@ async function readFilteringModeDetails() {
         localRead('adminNoFiltering'),
     ]);
     if ( userModes === undefined ) {
-        userModes = { basic: [ 'all-urls' ] };
+        userModes = { none: [ 'all-urls' ] };
     }
     userModes = unserializeModeDetails(userModes);
     if ( Array.isArray(adminNoFiltering) ) {
@@ -302,7 +260,7 @@ async function filteringModesToDNR(modes) {
     }
     const addRules = [];
     const noneHostnames = [ ...modes.none ];
-    const notNoneHostnames = [ ...modes.basic, ...modes.optimal, ...modes.complete ];
+    const notNoneHostnames = [ ...modes.optimal ];
     if ( noneHostnames.length !== 0 ) {
         const rule0 = {
             id: TRUSTED_DIRECTIVE_BASE_RULE_ID+0,
@@ -352,9 +310,7 @@ export async function getFilteringModeDetails() {
     const actualDetails = await readFilteringModeDetails();
     return {
         none: new Set(actualDetails.none),
-        basic: new Set(actualDetails.basic),
         optimal: new Set(actualDetails.optimal),
-        complete: new Set(actualDetails.complete),
     };
 }
 
@@ -420,22 +376,17 @@ export async function syncWithBrowserPermissions() {
     ]);
     const allowedHostnames = new Set(hostnamesFromMatches(permissions.origins || []));
     let modified = false;
-    if ( beforeMode > MODE_BASIC && allowedHostnames.has('all-urls') === false ) {
-        await setDefaultFilteringMode(MODE_BASIC);
+    if (beforeMode > MODE_NONE && allowedHostnames.has('all-urls') === false) {
+        await setDefaultFilteringMode(MODE_NONE);
         modified = true;
     }
     const afterMode = await getDefaultFilteringMode();
-    if ( afterMode > MODE_BASIC ) { return false; }
+    if (afterMode > MODE_NONE) { return false; }
     const filteringModes = await getFilteringModeDetails();
-    const { optimal, complete } = filteringModes;
-    for ( const hn of optimal ) {
-        if ( allowedHostnames.has(hn) ) { continue; }
+    const { optimal } = filteringModes;
+    for (const hn of optimal) {
+        if (allowedHostnames.has(hn)) { continue; }
         optimal.delete(hn);
-        modified = true;
-    }
-    for ( const hn of complete ) {
-        if ( allowedHostnames.has(hn) ) { continue; }
-        complete.delete(hn);
         modified = true;
     }
     await writeFilteringModeDetails(filteringModes);

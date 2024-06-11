@@ -137,7 +137,7 @@ async function onPermissionsRemoved() {
     const modified = await syncWithBrowserPermissions();
     if ( modified === false ) { return false; }
     const afterMode = await getDefaultFilteringMode();
-    if ( beforeMode > 1 && afterMode <= 1 ) {
+    if ( beforeMode > 0 && afterMode <= 0 ) {
         updateDynamicRules();
     }
     registerInjectables();
@@ -228,7 +228,7 @@ function onMessage(request, sender, callback) {
         return true;
 
     case 'setShowBlockedCount':
-        rulesetConfig.showBlockedCount = request.state && true || false;
+        rulesetConfig.showBlockedCount = true;
         if ( canShowBlockedCount ) {
             dnr.setExtensionActionOptions({
                 displayActionCountAsBadgeText: rulesetConfig.showBlockedCount,
@@ -282,7 +282,7 @@ function onMessage(request, sender, callback) {
                 ({ beforeLevel, afterLevel })
             )
         ).then(({ beforeLevel, afterLevel }) => {
-            if ( beforeLevel === 1 || afterLevel === 1 ) {
+            if ( beforeLevel === 0 || afterLevel === 0 ) {
                 updateDynamicRules();
             }
             if ( afterLevel !== beforeLevel ) {

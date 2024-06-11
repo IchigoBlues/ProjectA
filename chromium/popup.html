@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html id="uBO-popup-panel" class="desktop">
-
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,17 +10,12 @@
 <link rel="stylesheet" href="css/popup.css">
 <title data-i18n="extName"></title>
 </head>
-
 <body class="loading" data-section="">
 <div id="main">
     <div id="hostname"><span></span>&shy;<span></span></div>
     <!-- -------- -->
-    <div class="filteringModeSlider">
-        <div class="filteringModeButton"><div></div></div>
-        <span data-level="0"></span>
-        <span data-level="1"></span>
-        <span data-level="2"></span>
-        <span data-level="3"></span>
+    <div class="filteringModeButtonContainer">
+        <button id="filteringModeButton" data-level="0">Off</button>
     </div>
     <!-- -------- -->
     <div id="filteringModeText"><label data-i18n="popupFilteringModeLabel">_</label><br><span>_</span><span></span></div>
@@ -33,8 +27,7 @@
         <span class="fa-icon tool enabled" tabindex="0" data-i18n-title="popupTipDashboard">cogs<span class="caption" data-i18n="popupTipDashboard"></span></span>
     </div>
     <!-- -------- -->
-    <div id="rulesetStats" data-section="a">
-    </div>
+    <div id="rulesetStats" data-section="a"></div>
     <hr data-section="a">
     <!-- -------- -->
     <div id="moreOrLess">
@@ -57,5 +50,4 @@
 <script src="js/popup.js" type="module"></script>
 
 </body>
-
 </html>
