@@ -53,20 +53,26 @@ function normalizedHostname(hn) {
 
 const BLOCKING_MODE_MAX = 1;
 
+// Function to set filtering mode and save the state
 function setFilteringMode(level, commit = false) {
-    const modeButton = qs$('#filteringModeButton');
-    modeButton.dataset.level = level;
-    modeButton.textContent = level === 0 ? 'Off' : 'On';
+    const modeImage = qs$('#filteringModeImage');
+    modeImage.dataset.level = level;
+    modeImage.src = level === 0 ? 'img/redguard_off.png' : 'img/redguard.png';
+    const filteringModeText = level === 0 ? i18n$('filteringMode0Name') : i18n$('filteringMode1Name');
+    dom.text('#filteringModeCurrentText', filteringModeText);
+    // Save the state to local storage
+    localWrite('filteringMode', level);
     if (commit !== true) { return; }
     commitFilteringMode();
 }
 
+// Function to commit the filtering mode
 async function commitFilteringMode() {
     if (tabHostname === '') { return; }
     const targetHostname = normalizedHostname(tabHostname);
-    const modeButton = qs$('#filteringModeButton');
-    const afterLevel = parseInt(modeButton.dataset.level, 10);
-    const beforeLevel = parseInt(modeButton.dataset.levelBefore, 10);
+    const modeImage = qs$('#filteringModeImage');
+    const afterLevel = parseInt(modeImage.dataset.level, 10);
+    const beforeLevel = parseInt(modeImage.dataset.levelBefore, 10);
     if (afterLevel === 1) {
         let granted = false;
         try {
@@ -81,8 +87,8 @@ async function commitFilteringMode() {
         }
     }
     dom.text(
-        '#filteringModeText > span:nth-of-type(1)',
-        i18n$(`filteringMode${afterLevel}Name`)
+        '#filteringModeCurrentText',
+        afterLevel === 0 ? i18n$('filteringMode0Name') : i18n$('filteringMode1Name')
     );
     const actualLevel = await sendMessage({
         what: 'setFilteringMode',
@@ -97,89 +103,15 @@ async function commitFilteringMode() {
     }
 }
 
-{
-    // Remove slider-related variables and functions
-    const modeButton = qs$('#filteringModeButton');
-
-    // Function to toggle filtering mode
-    const toggleFilteringMode = () => {
-        const currentLevel = parseInt(modeButton.dataset.level, 10);
-        const newLevel = currentLevel === 0 ? 1 : 0;
-        setFilteringMode(newLevel, true);
-    };
-
-    // Event listener for button click
-    dom.on('#filteringModeButton', 'click', toggleFilteringMode);
-}
-
-/******************************************************************************/
-
-// The popup panel is made of sections. Visibility of sections can be
-// toggled on/off.
-
-const maxNumberOfSections = 2;
-
-const sectionBitsFromAttribute = function() {
-    const value = dom.body.dataset.section;
-    if (value === '') { return 0; }
-    let bits = 0;
-    for (const c of value.split(' ')) {
-        bits |= 1 << (c.charCodeAt(0) - 97);
-    }
-    return bits;
-};
-
-const sectionBitsToAttribute = function(bits) {
-    if (typeof bits !== 'number') { return; }
-    if (isNaN(bits)) { return; }
-    const value = [];
-    for (let i = 0; i < maxNumberOfSections; i++) {
-        const bit = 1 << i;
-        if ((bits & bit) === 0) { continue; }
-        value.push(String.fromCharCode(97 + i));
-    }
-    dom.body.dataset.section = value.join(' ');
-};
-
-async function toggleSections(more) {
-    let currentBits = sectionBitsFromAttribute();
-    let newBits = currentBits;
-    for (let i = 0; i < maxNumberOfSections; i++) {
-        const bit = 1 << (more ? i : maxNumberOfSections - i - 1);
-        if (more) {
-            newBits |= bit;
-        } else {
-            newBits &= ~bit;
-        }
-        if (newBits !== currentBits) { break; }
-    }
-    if (newBits === currentBits) { return; }
-    sectionBitsToAttribute(newBits);
-    localWrite('popupPanelSections', newBits);
-}
-
-localRead('popupPanelSections').then(bits => {
-    sectionBitsToAttribute(bits || 0);
+// Event listener for image click
+dom.on('#filteringModeImage', 'click', () => {
+    const modeImage = qs$('#filteringModeImage');
+    const currentLevel = parseInt(modeImage.dataset.level, 10);
+    const newLevel = currentLevel === 0 ? 1 : 0;
+    setFilteringMode(newLevel, true);
 });
 
-dom.on('#moreButton', 'click', () => {
-    toggleSections(true);
-});
-
-dom.on('#lessButton', 'click', () => {
-    toggleSections(false);
-});
-
-/******************************************************************************/
-
-dom.on('[data-i18n-title="popupTipDashboard"]', 'click', ev => {
-    if (ev.isTrusted !== true) { return; }
-    if (ev.button !== 0) { return; }
-    runtime.openOptionsPage();
-});
-
-/******************************************************************************/
-
+// Initialize the popup and load the saved state
 async function init() {
     const [tab] = await browser.tabs.query({
         active: true,
@@ -206,7 +138,10 @@ async function init() {
         }
     }
 
-    setFilteringMode(popupPanelData.level);
+    // Load the saved state from local storage or set to default (1)
+    const savedMode = await localRead('filteringMode');
+    const initialMode = savedMode !== null ? parseInt(savedMode, 10) : 1; // Default to 'On' (1)
+    setFilteringMode(initialMode); // This ensures the button is set correctly on load
 
     dom.text('#hostname', punycode.toUnicode(tabHostname));
 
@@ -253,5 +188,3 @@ async function tryInit() {
 }
 
 tryInit();
-
-/******************************************************************************/

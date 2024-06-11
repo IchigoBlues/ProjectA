@@ -9,19 +9,21 @@
 <link rel="stylesheet" href="css/filtering-mode.css">
 <link rel="stylesheet" href="css/popup.css">
 <title data-i18n="extName"></title>
+
 </head>
 <body class="loading" data-section="">
 <div id="main">
     <div id="hostname"><span></span>&shy;<span></span></div>
     <!-- -------- -->
     <div class="filteringModeButtonContainer">
-        <button id="filteringModeButton" data-level="0">Off</button>
+        <img id="filteringModeImage" src="img/redguard.png" alt="Filtering Mode">
     </div>
     <!-- -------- -->
-    <div id="filteringModeText"><label data-i18n="popupFilteringModeLabel">_</label><br><span>_</span><span></span></div>
+    <div id="filteringModeText">
+        <label data-i18n="popupFilteringModeLabel"></label><br>
+        <span id="filteringModeCurrentText">optimal</span>
+    </div>    
     <div class="toolRibbon pageTools">
-        <span></span>
-        <span></span>
         <span></span>
         <span></span>
         <span class="fa-icon tool enabled" tabindex="0" data-i18n-title="popupTipDashboard">cogs<span class="caption" data-i18n="popupTipDashboard"></span></span>
@@ -30,14 +32,7 @@
     <div id="rulesetStats" data-section="a"></div>
     <hr data-section="a">
     <!-- -------- -->
-    <div id="moreOrLess">
-        <span id="moreButton">
-            <span data-i18n="popupMoreButton">_</span>&emsp;<span class="fa-icon">angle-up</span>
-        </span>
-        <span id="lessButton">
-            <span class="fa-icon">angle-up</span>&emsp;<span data-i18n="popupLessButton">_</span>
-        </span>
-    </div>
+
 </div>
 
 <div id="templates">

@@ -120,7 +120,7 @@
     "description": "Name of blocking mode 0"
   },
   "filteringMode1Name": {
-    "message": "basic",
+    "message": "optimal",
     "description": "Name of blocking mode 1"
   },
   "filteringMode2Name": {
