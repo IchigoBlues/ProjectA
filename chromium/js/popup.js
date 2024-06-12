@@ -1,31 +1,3 @@
-/*******************************************************************************
-
-    uBlock Origin Lite - a comprehensive, MV3-compliant content blocker
-    Copyright (C) 2022-present Raymond Hill
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see {http://www.gnu.org/licenses/}.
-
-    Home: https://github.com/gorhill/uBlock
-
-*******************************************************************************/
-
-/* jshint esversion:11 */
-
-'use strict';
-
-/******************************************************************************/
-
 import {
     browser,
     runtime,
@@ -49,24 +21,19 @@ function normalizedHostname(hn) {
     return hn.replace(/^www\./, '');
 }
 
-/******************************************************************************/
-
-const BLOCKING_MODE_MAX = 1;
-
-// Function to set filtering mode and save the state
-function setFilteringMode(level, commit = false) {
+async function setFilteringMode(level, commit = false) {
     const modeImage = qs$('#filteringModeImage');
     modeImage.dataset.level = level;
     modeImage.src = level === 0 ? 'img/redguard_off.png' : 'img/redguard.png';
-    const filteringModeText = level === 0 ? i18n$('filteringMode0Name') : i18n$('filteringMode1Name');
+    const filteringModeText = level === 0 ? 'no filtering' : 'optimal';
     dom.text('#filteringModeCurrentText', filteringModeText);
+
     // Save the state to local storage
-    localWrite('filteringMode', level);
+    await localWrite('filteringMode', level);
     if (commit !== true) { return; }
-    commitFilteringMode();
+    await commitFilteringMode();
 }
 
-// Function to commit the filtering mode
 async function commitFilteringMode() {
     if (tabHostname === '') { return; }
     const targetHostname = normalizedHostname(tabHostname);
@@ -86,10 +53,6 @@ async function commitFilteringMode() {
             return;
         }
     }
-    dom.text(
-        '#filteringModeCurrentText',
-        afterLevel === 0 ? i18n$('filteringMode0Name') : i18n$('filteringMode1Name')
-    );
     const actualLevel = await sendMessage({
         what: 'setFilteringMode',
         hostname: targetHostname,
@@ -103,15 +66,27 @@ async function commitFilteringMode() {
     }
 }
 
-// Event listener for image click
-dom.on('#filteringModeImage', 'click', () => {
+async function updateButtonState() {
+    const level = await sendMessage({
+        what: 'getFilteringMode',
+        hostname: normalizedHostname(tabHostname),
+    });
+    setFilteringMode(level);
+}
+
+dom.on('#filteringModeImage', 'click', async () => {
     const modeImage = qs$('#filteringModeImage');
     const currentLevel = parseInt(modeImage.dataset.level, 10);
     const newLevel = currentLevel === 0 ? 1 : 0;
-    setFilteringMode(newLevel, true);
+    await setFilteringMode(newLevel, true);
 });
 
-// Initialize the popup and load the saved state
+dom.on('[data-i18n-title="popupTipDashboard"]', 'click', ev => {
+    if (ev.isTrusted !== true) { return; }
+    if (ev.button !== 0) { return; }
+    runtime.openOptionsPage();
+});
+
 async function init() {
     const [tab] = await browser.tabs.query({
         active: true,
@@ -138,10 +113,7 @@ async function init() {
         }
     }
 
-    // Load the saved state from local storage or set to default (1)
-    const savedMode = await localRead('filteringMode');
-    const initialMode = savedMode !== null ? parseInt(savedMode, 10) : 1; // Default to 'On' (1)
-    setFilteringMode(initialMode); // This ensures the button is set correctly on load
+    await updateButtonState();
 
     dom.text('#hostname', punycode.toUnicode(tabHostname));
 
