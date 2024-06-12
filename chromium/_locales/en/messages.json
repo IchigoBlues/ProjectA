@@ -136,7 +136,7 @@
     "description": "This describes the 'basic' filtering mode"
   },
   "optimalFilteringModeDescription": {
-    "message": "Advanced network filtering plus specific extended filtering from selected filter lists.\n\nRequires broad permission to read and modify data on all websites.",
+    "message": "Advanced network filtering plus specific extended filtering from selected filter lists.",
     "description": "This describes the 'optimal' filtering mode"
   },
   "completeFilteringModeDescription": {
@@ -156,7 +156,7 @@
     "description": "Label for a checkbox in the options page"
   },
   "showBlockedCountLabel": {
-    "message": "Show the number of blocked requests on the toolbar icon",
+    "message": "Show the number of blocked ads and trackers on the toolbar icon",
     "description": "Label for a checkbox in the options page"
   }
 }
