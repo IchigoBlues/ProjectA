@@ -7,7 +7,7 @@
     },
     "default_popup": "popup.html"
   },
-  "author": "Raymond Hill",
+  "author": "RedGuard",
   "background": {
     "service_worker": "/js/background.js",
     "type": "module"
@@ -241,7 +241,7 @@
   },
   "manifest_version": 3,
   "minimum_chrome_version": "118.0",
-  "name": "__MSG_extName__",
+  "name": "RedGuard",
   "options_page": "dashboard.html",
   "optional_host_permissions": [
     "<all_urls>"
@@ -252,7 +252,7 @@
     "scripting",
     "storage"
   ],
-  "short_name": "uBO Lite",
+  "short_name": "RedGuard",
   "storage": {
     "managed_schema": "managed_storage.json"
   },

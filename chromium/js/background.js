@@ -1,3 +1,8 @@
+import { ExtPay } from './ExtPay.js'; // Adjust the path if needed
+
+const extpay = ExtPay('redguard');
+extpay.startBackground();
+
 import {
     adminRead,
     browser,
@@ -22,9 +27,9 @@ import {
 
 import {
     getDefaultFilteringMode,
+    setDefaultFilteringMode,
     getFilteringMode,
     getTrustedSites,
-    setDefaultFilteringMode,
     setFilteringMode,
     setTrustedSites,
     syncWithBrowserPermissions,
@@ -42,9 +47,7 @@ const rulesetConfig = {
 };
 
 const UBOL_ORIGIN = runtime.getURL('').replace(/\/$/, '');
-
 const canShowBlockedCount = typeof dnr.setExtensionActionOptions === 'function';
-
 let firstRun = false;
 let wakeupRun = false;
 
@@ -57,12 +60,8 @@ async function loadRulesetConfig() {
     if (data) {
         rulesetConfig.version = data.version;
         rulesetConfig.enabledRulesets = data.enabledRulesets;
-        rulesetConfig.autoReload = typeof data.autoReload === 'boolean'
-            ? data.autoReload
-            : true;
-        rulesetConfig.showBlockedCount = typeof data.showBlockedCount === 'boolean'
-            ? data.showBlockedCount
-            : true;
+        rulesetConfig.autoReload = typeof data.autoReload === 'boolean' ? data.autoReload : true;
+        rulesetConfig.showBlockedCount = typeof data.showBlockedCount === 'boolean' ? data.showBlockedCount : true;
         wakeupRun = true;
         return;
     }
@@ -70,12 +69,8 @@ async function loadRulesetConfig() {
     if (data) {
         rulesetConfig.version = data.version;
         rulesetConfig.enabledRulesets = data.enabledRulesets;
-        rulesetConfig.autoReload = typeof data.autoReload === 'boolean'
-            ? data.autoReload
-            : true;
-        rulesetConfig.showBlockedCount = typeof data.showBlockedCount === 'boolean'
-            ? data.showBlockedCount
-            : true;
+        rulesetConfig.autoReload = typeof data.autoReload === 'boolean' ? data.autoReload : true;
+        rulesetConfig.showBlockedCount = typeof data.showBlockedCount === 'boolean' ? data.showBlockedCount : true;
         sessionWrite('rulesetConfig', rulesetConfig);
         return;
     }
@@ -91,7 +86,9 @@ async function saveRulesetConfig() {
 }
 
 async function hasGreatPowers(origin) {
-    if (/^https?:\/\//.test(origin) === false) { return false; }
+    if (/^https?:\/\//.test(origin) === false) {
+        return false;
+    }
     return browser.permissions.contains({
         origins: [`${origin}/*`],
     });
@@ -106,7 +103,9 @@ function hasOmnipotence() {
 async function onPermissionsRemoved() {
     const beforeMode = await getDefaultFilteringMode();
     const modified = await syncWithBrowserPermissions();
-    if (modified === false) { return false; }
+    if (modified === false) {
+        return false;
+    }
     const afterMode = await getDefaultFilteringMode();
     if (beforeMode > 1 && afterMode <= 1) {
         updateDynamicRules();
@@ -146,7 +145,7 @@ function onMessage(request, sender, callback) {
                     defaultFilteringMode,
                     trustedSites: Array.from(trustedSites),
                     enabledRulesets,
-                    maxNumberOfEnabledRulesets: dnr.MAX_NUMBER_OF_ENABLED_STATIC_RULESETS,
+                    maxNumberOfEnabledStaticRulesets: dnr.MAX_NUMBER_OF_ENABLED_STATIC_RULESETS,
                     rulesetDetails: Array.from(rulesetDetails.values()),
                     autoReload: rulesetConfig.autoReload,
                     showBlockedCount: rulesetConfig.showBlockedCount,
@@ -206,7 +205,9 @@ function onMessage(request, sender, callback) {
 
         case 'setFilteringMode': {
             getFilteringMode(request.hostname).then(actualLevel => {
-                if (request.level === actualLevel) { return actualLevel; }
+                if (request.level === actualLevel) {
+                    return actualLevel;
+                }
                 return setFilteringMode(request.hostname, request.level);
             }).then(actualLevel => {
                 registerInjectables();
@@ -259,7 +260,6 @@ async function start() {
         await enableRulesets(rulesetConfig.enabledRulesets);
     }
 
-    // We need to update the regex rules only when ruleset version changes.
     if (wakeupRun === false) {
         const currentVersion = getCurrentVersion();
         if (currentVersion !== rulesetConfig.version) {
@@ -302,6 +302,21 @@ async function start() {
             runtime.openOptionsPage();
         }
     }
+
+    checkTrialStatus(); // Check trial status when the extension starts
+}
+
+function checkTrialStatus() {
+    extpay.getUser().then(user => {
+        if (!user.trialStartedAt) {
+            setDefaultFilteringMode(0); // Set to no filter
+            extpay.openTrialPage('Start your 7-day free trial!');
+        } else {
+            setDefaultFilteringMode(1); // Set to optimal filter
+        }
+    }).catch(error => {
+        console.error('Failed to get user info:', error);
+    });
 }
 
 try {
@@ -309,3 +324,11 @@ try {
 } catch (reason) {
     console.trace(reason);
 }
+
+// Check trial status on any extension interaction
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.checkTrialStatus) {
+        checkTrialStatus();
+        sendResponse({ status: 'checked' });
+    }
+});

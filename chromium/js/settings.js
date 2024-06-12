@@ -251,12 +251,8 @@ async function renderDefaultMode() {
 
     if (defaultLevel === 0) {
         qs$(`.filteringModeCard input[type="radio"][value="0"]`).checked = true;
-        qs$('#defaultFilteringModeButtonNoFilter').textContent = 'Off';
-        qs$('#defaultFilteringModeButtonOptimal').textContent = 'On';
     } else {
         qs$(`.filteringModeCard input[type="radio"][value="1"]`).checked = true;
-        qs$('#defaultFilteringModeButtonNoFilter').textContent = 'On';
-        qs$('#defaultFilteringModeButtonOptimal').textContent = 'Off';
     }
 }
 

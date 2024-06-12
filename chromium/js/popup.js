@@ -8,6 +8,9 @@ import {
 import { dom, qs$ } from './dom.js';
 import { i18n, i18n$ } from './i18n.js';
 import punycode from './punycode.js';
+import { ExtPay } from './ExtPay.js';
+
+const extpay = ExtPay('redguard');
 
 /******************************************************************************/
 
@@ -78,6 +81,14 @@ dom.on('#filteringModeImage', 'click', async () => {
     const modeImage = qs$('#filteringModeImage');
     const currentLevel = parseInt(modeImage.dataset.level, 10);
     const newLevel = currentLevel === 0 ? 1 : 0;
+
+    // Check trial status before allowing changes
+    const user = await extpay.getUser();
+    if (!user.trialStartedAt) {
+        extpay.openTrialPage('Start your 7-day free trial!');
+        return; // Do not allow changes if trial not started
+    }
+
     await setFilteringMode(newLevel, true);
 });
 
@@ -85,6 +96,34 @@ dom.on('[data-i18n-title="popupTipDashboard"]', 'click', ev => {
     if (ev.isTrusted !== true) { return; }
     if (ev.button !== 0) { return; }
     runtime.openOptionsPage();
+});
+
+async function updateTrialButton() {
+    const user = await extpay.getUser();
+    const startTrialButton = document.getElementById('startTrialButton');
+    const trialCountdown = document.getElementById('trialCountdown');
+    if (!user.trialStartedAt) {
+        startTrialButton.style.display = 'block';
+        trialCountdown.style.display = 'none';
+    } else {
+        startTrialButton.style.display = 'none';
+        const now = new Date();
+        const trialEnd = new Date(user.trialStartedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const timeRemaining = trialEnd - now;
+        if (timeRemaining > 0) {
+            const daysRemaining = Math.ceil(timeRemaining / (24 * 60 * 60 * 1000));
+            trialCountdown.innerText = `Free trial days remaining: ${daysRemaining}`;
+            trialCountdown.style.display = 'block';
+        } else {
+            trialCountdown.innerText = 'Free trial has expired';
+            trialCountdown.style.display = 'block';
+        }
+    }
+}
+
+dom.on('#startTrialButton', 'click', async () => {
+    await extpay.openTrialPage('Start your 7-day free trial!');
+    await updateTrialButton();
 });
 
 async function init() {
@@ -114,6 +153,7 @@ async function init() {
     }
 
     await updateButtonState();
+    await updateTrialButton();
 
     dom.text('#hostname', punycode.toUnicode(tabHostname));
 
