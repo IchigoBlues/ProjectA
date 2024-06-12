@@ -29,30 +29,32 @@ a {
     outline: 0;
     }
 
-    .filteringModeButtonContainer {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 50px; /* Set specific width */
-        height: 50px; /* Set specific height */
-        margin: auto; /* Center the switch element */
-        padding: 0;
-    }
-    
-    #filteringModeImage {
-        width: 100%;
-        height: 100%;
-        object-fit: cover; /* Ensure the image covers the entire area */
-        cursor: pointer;
-    }
-
 #main {
     align-self: flex-start;
     display: flex;
     flex-direction: column;
+    width: 200px;
     max-width: 340px;
     min-width: 100%;
-    }
+}
+
+.filteringModeButtonContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 75px; /* Set specific width */
+    height: 75px; /* Set specific height */
+    margin: auto; /* Center the switch element */
+    padding-top: 10px;
+}
+
+#filteringModeImage {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Ensure the image covers the entire area */
+    cursor: pointer;
+}
+
 :root.portrait #main {
     align-self: inherit;
     }
