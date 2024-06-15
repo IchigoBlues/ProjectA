@@ -82,14 +82,31 @@ dom.on('#filteringModeImage', 'click', async () => {
     const currentLevel = parseInt(modeImage.dataset.level, 10);
     const newLevel = currentLevel === 0 ? 1 : 0;
 
-    // Check trial status before allowing changes
-    const user = await extpay.getUser();
-    if (!user.trialStartedAt) {
+    chrome.runtime.sendMessage({ checkTrialStatus: true }, function(response) {
+        console.log(response.status);
+        let state = response.status
+
+        
+    if (state === 'notStartedTrial') {
         extpay.openTrialPage('Start your 7-day free trial!');
-        return; // Do not allow changes if trial not started
+        return;
+    }
+    else if (state === 'trialActive') {
+        setFilteringMode(newLevel, true);
+    }
+    else if (state === 'trialExpired') {
+        setFilteringMode(0, true);
+        extpay.openPaymentPage('Please support the developer to continue using this amazing extension!');
+    } else if (state === 'paidUser') {
+        setFilteringMode(newLevel, true);
+    } else {
+        console.log('Unknown state');
+        return;
     }
 
-    await setFilteringMode(newLevel, true);
+    });
+
+
 });
 
 dom.on('[data-i18n-title="popupTipDashboard"]', 'click', ev => {
@@ -124,6 +141,37 @@ async function updateTrialButton() {
 dom.on('#startTrialButton', 'click', async () => {
     await extpay.openTrialPage('Start your 7-day free trial!');
     await updateTrialButton();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Assuming you have a button or some interactive element
+    const startTrial = document.getElementById('startTrialButton');
+
+    startTrial.addEventListener('click', function() {
+        chrome.runtime.sendMessage({ checkTrialStatus: true }, function(response) {
+            console.log(response.status);
+        });
+
+        let state = response.status
+
+        if (state === 'notStartedTrial') {
+            extpay.openTrialPage('Start your 7-day free trial!');
+            return;
+        }
+        // else if (state === 'trialActive') {
+        //     setFilteringMode(1, true);
+        // }
+        // else if (state === 'trialExpired') {
+        //     setFilteringMode(0, true);
+        //     extpay.openPaymentPage('Please support the developer to continue using this amazing extension!');
+        // } else if (state === 'paid') {
+        //     setFilteringMode(1, true);
+        // } else {
+        //     console.log('Unknown state');
+        //     return;
+        // }
+
+    });
 });
 
 async function init() {
@@ -188,7 +236,18 @@ async function init() {
 
     dom.cl.remove(dom.body, 'loading');
 
-    return true;
+    // Listen for messages from the background script to enable/disable the button
+    // chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    //     if (message.action === 'disableFilteringModeButton') {
+    //         disableFilteringModeButton();
+    //         sendResponse({ status: 'disabled' });
+    //     } else if (message.action === 'enableFilteringModeButton') {
+    //         enableFilteringModeButton();
+    //         sendResponse({ status: 'enabled' });
+    //     }
+    // });
+
+    // return true;
 }
 
 async function tryInit() {

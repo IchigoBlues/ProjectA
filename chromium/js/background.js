@@ -50,6 +50,7 @@ const UBOL_ORIGIN = runtime.getURL('').replace(/\/$/, '');
 const canShowBlockedCount = typeof dnr.setExtensionActionOptions === 'function';
 let firstRun = false;
 let wakeupRun = false;
+let state = 'null';
 
 function getCurrentVersion() {
     return runtime.getManifest().version;
@@ -301,21 +302,62 @@ async function start() {
         if (disableFirstRunPage !== true) {
             runtime.openOptionsPage();
         }
+        extpay.openTrialPage('Start your 7-day free trial!');
     }
+
 
     checkTrialStatus(); // Check trial status when the extension starts
 }
 
+
 function checkTrialStatus() {
     extpay.getUser().then(user => {
+        const now = new Date();
+
+        if (user.paid) {
+            //userPaid = true;
+            //setDefaultFilteringMode(1); // Set to optimal filter
+            //setFilteringMode(1); // Set current mode to optimal filter
+            //enableFilteringModeButton();
+            console.log('paid user')
+            state='paidUser';
+
+            return;
+        }
+
         if (!user.trialStartedAt) {
-            setDefaultFilteringMode(0); // Set to no filter
-            extpay.openTrialPage('Start your 7-day free trial!');
+           // setDefaultFilteringMode(0); // Set to no filter
+           // setFilteringMode(0); // Set current mode to no filter
+            //disableFilteringModeButton();
+            console.log('not started trial')
+            state='notStartedTrial'
+            //extpay.openTrialPage('Start your 7-day free trial!');
+            return;
+        }
+
+        const trialEnd = new Date(user.trialStartedAt.getTime() + 1 * 60 * 1000); // 1 minute trial period
+        if (now < trialEnd) {
+            // Trial is still active
+          //  setDefaultFilteringMode(1); // Set to optimal filter
+          //  setFilteringMode(1); // Set current mode to optimal filter
+            console.log('Trial is still active')
+            state='trialActive'
+
+           // enableFilteringModeButton();
         } else {
-            setDefaultFilteringMode(1); // Set to optimal filter
+            // Trial has expired
+          //  setDefaultFilteringMode(0); // Set to no filter
+          //  setFilteringMode(0); // Set current mode to optimal filter
+            console.log('Trial has expired')
+            state='trialExpired'
+
+
+            //disableFilteringModeButton();
         }
     }).catch(error => {
         console.error('Failed to get user info:', error);
+       // setDefaultFilteringMode(0);
+       // setFilteringMode(0);
     });
 }
 
@@ -325,10 +367,54 @@ try {
     console.trace(reason);
 }
 
+
+
+// Example to set the filtering mode to 1 (optimal)
+
+
+// function disableFilteringModeButton() {
+//     chrome.runtime.sendMessage({
+//         what: 'setFilteringMode',
+//         hostname: 'all-urls', // replace with the actual hostname
+//         level: 0 // 0 for no filter, 1 for optimal filter
+//     }, function(response) {
+//         console.log('Filtering mode set to:', response);
+//     });
+
+//     chrome.runtime.sendMessage({
+//         what: 'setDefaultFilteringMode',
+//         level: 0 // 0 for no filter, 1 for optimal filter
+//     }, function(response) {
+//         console.log('Default filtering mode set to:', response);
+//     });
+
+// }
+
+// function enableFilteringModeButton() {
+//     chrome.runtime.sendMessage({
+//         what: 'setFilteringMode',
+//         hostname: '', // replace with the actual hostname
+//         level: 1 // 0 for no filter, 1 for optimal filter
+//     }, function(response) {
+//         console.log('Filtering mode set to:', response);
+//     });
+
+//     chrome.runtime.sendMessage({
+//     what: 'setDefaultFilteringMode',
+//     level: 1 // 0 for no filter, 1 for optimal filter
+// }, function(response) {
+//     console.log('Default filtering mode set to:', response);
+// });
+
+// }
+
+
+
 // Check trial status on any extension interaction
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.checkTrialStatus) {
         checkTrialStatus();
-        sendResponse({ status: 'checked' });
+        sendResponse({ status: state });
     }
 });
+
