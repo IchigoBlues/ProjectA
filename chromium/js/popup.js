@@ -17,6 +17,7 @@ const extpay = ExtPay('redguard');
 const popupPanelData = {};
 const currentTab = {};
 let tabHostname = '';
+let userPaid = false; //to make this more useful you'll have to put this in chrome storage otherwise this resets every time the computer shuts off
 
 /******************************************************************************/
 
@@ -70,11 +71,33 @@ async function commitFilteringMode() {
 }
 
 async function updateButtonState() {
-    const level = await sendMessage({
-        what: 'getFilteringMode',
-        hostname: normalizedHostname(tabHostname),
+
+    const subscriptionStatus = await new Promise(resolve => {
+        chrome.storage.local.get(['subscriptionStatus'], result => {
+            resolve(result.subscriptionStatus  || 'trialExpired');
+        });
+
     });
-    setFilteringMode(level);
+
+        
+    if (subscriptionStatus === 'notStartedTrial') {
+        setFilteringMode(0, true);
+        return;
+    }
+    else if (subscriptionStatus === 'trialActive') {
+        setFilteringMode(1, true);
+    }
+    else if (subscriptionStatus === 'trialExpired') {
+        setFilteringMode(0, true);
+    } else if (subscriptionStatus === 'paidUser') {
+        setFilteringMode(1, true);
+    } else {
+        console.log('Unknown state');
+        return;
+    }
+
+
+
 }
 
 dom.on('#filteringModeImage', 'click', async () => {
@@ -82,12 +105,20 @@ dom.on('#filteringModeImage', 'click', async () => {
     const currentLevel = parseInt(modeImage.dataset.level, 10);
     const newLevel = currentLevel === 0 ? 1 : 0;
 
-    chrome.runtime.sendMessage({ checkTrialStatus: true }, function(response) {
-        console.log(response.status);
-        let state = response.status
+
+
+    const subscriptionStatus = await new Promise(resolve => {
+        chrome.storage.local.get(['subscriptionStatus'], result => {
+            resolve(result.subscriptionStatus  || 'trialExpired');
+        });
+
+
+    });
+        let state = subscriptionStatus
 
         
     if (state === 'notStartedTrial') {
+        setFilteringMode(0, true);
         extpay.openTrialPage('Start your 7-day free trial!');
         return;
     }
@@ -104,8 +135,6 @@ dom.on('#filteringModeImage', 'click', async () => {
         return;
     }
 
-    });
-
 
 });
 
@@ -115,63 +144,75 @@ dom.on('[data-i18n-title="popupTipDashboard"]', 'click', ev => {
     runtime.openOptionsPage();
 });
 
-async function updateTrialButton() {
-    const user = await extpay.getUser();
-    const startTrialButton = document.getElementById('startTrialButton');
+async function updatePopup() { // you need to make this more efficient. this function gets called every time a new tab is open which is so bad
+    const startTrialButton = document.getElementById('startTrialButton'); //but even after the user pays, there's going to be so maany unnecessary calls to this function
+    const subscribeButton = document.getElementById('subscribeButton'); //look into chrome storage to store the user's trial status
     const trialCountdown = document.getElementById('trialCountdown');
-    if (!user.trialStartedAt) {
-        startTrialButton.style.display = 'block';
-        trialCountdown.style.display = 'none';
-    } else {
-        startTrialButton.style.display = 'none';
-        const now = new Date();
-        const trialEnd = new Date(user.trialStartedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const timeRemaining = trialEnd - now;
-        if (timeRemaining > 0) {
-            const daysRemaining = Math.ceil(timeRemaining / (24 * 60 * 60 * 1000));
-            trialCountdown.innerText = `Free trial days remaining: ${daysRemaining}`;
-            trialCountdown.style.display = 'block';
-        } else {
-            trialCountdown.innerText = 'Free trial has expired';
-            trialCountdown.style.display = 'block';
-        }
-    }
+
+    const subscriptionStatus = await new Promise(resolve => {
+        chrome.storage.local.get(['subscriptionStatus'], result => {
+            resolve(result.subscriptionStatus  || 'trialExpired');
+        });
+    });
+            updateButtonState();
+
+
+            if (subscriptionStatus === 'notStartedTrial') {
+
+                startTrialButton.style.display = 'block';
+                subscribeButton.style.display = 'none';
+                trialCountdown.style.display = 'none';
+                
+            } else if (subscriptionStatus === 'paidUser') {
+                startTrialButton.style.display = 'none';
+                subscribeButton.style.display = 'block';
+                trialCountdown.style.display = 'none';
+                subscribeButton.textContent = 'Manage Subscription';
+            } else if (subscriptionStatus === 'trialActive') {
+                startTrialButton.style.display = 'none';
+                subscribeButton.style.display = 'block';
+                trialCountdown.style.display = 'block';
+            } else if (subscriptionStatus === 'trialExpired') {
+                startTrialButton.style.display = 'none';
+                subscribeButton.style.display = 'block';
+                trialCountdown.innerText = 'Free trial has expired';
+                trialCountdown.style.display = 'block';
+            } else {
+                console.log('Unknown state');
+                return;
+            }
+
+
+
 }
 
 dom.on('#startTrialButton', 'click', async () => {
     await extpay.openTrialPage('Start your 7-day free trial!');
-    await updateTrialButton();
+    await updatePopup();
 });
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Assuming you have a button or some interactive element
-    const startTrial = document.getElementById('startTrialButton');
+dom.on('#subscribeButton', 'click', async () => {
+    await extpay.openPaymentPage('Please support the developer to continue using this amazing extension!');
+    await updatePopup();
 
-    startTrial.addEventListener('click', function() {
-        chrome.runtime.sendMessage({ checkTrialStatus: true }, function(response) {
-            console.log(response.status);
+});
+
+// Add a listener for messages from background.js
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'update') {
+
+        chrome.runtime.sendMessage({ checkSubscriptionStatus: true });
+        
+        const subscriptionStatus = new Promise(resolve => {
+            chrome.storage.local.get(['subscriptionStatus'], result => {
+                resolve(result.subscriptionStatus  || 'trialExpired');
+            });
         });
-
-        let state = response.status
-
-        if (state === 'notStartedTrial') {
-            extpay.openTrialPage('Start your 7-day free trial!');
-            return;
+        if (subscriptionStatus !== 'userPaid') {
+        updatePopup();
         }
-        // else if (state === 'trialActive') {
-        //     setFilteringMode(1, true);
-        // }
-        // else if (state === 'trialExpired') {
-        //     setFilteringMode(0, true);
-        //     extpay.openPaymentPage('Please support the developer to continue using this amazing extension!');
-        // } else if (state === 'paid') {
-        //     setFilteringMode(1, true);
-        // } else {
-        //     console.log('Unknown state');
-        //     return;
-        // }
-
-    });
+  
+    }
 });
 
 async function init() {
@@ -200,8 +241,7 @@ async function init() {
         }
     }
 
-    await updateButtonState();
-    await updateTrialButton();
+    await updatePopup();
 
     dom.text('#hostname', punycode.toUnicode(tabHostname));
 
@@ -236,18 +276,7 @@ async function init() {
 
     dom.cl.remove(dom.body, 'loading');
 
-    // Listen for messages from the background script to enable/disable the button
-    // chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    //     if (message.action === 'disableFilteringModeButton') {
-    //         disableFilteringModeButton();
-    //         sendResponse({ status: 'disabled' });
-    //     } else if (message.action === 'enableFilteringModeButton') {
-    //         enableFilteringModeButton();
-    //         sendResponse({ status: 'enabled' });
-    //     }
-    // });
 
-    // return true;
 }
 
 async function tryInit() {

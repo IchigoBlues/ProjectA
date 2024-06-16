@@ -248,6 +248,7 @@
   ],
   "permissions": [
     "activeTab",
+    "tabs",
     "declarativeNetRequest",
     "scripting",
     "storage"
