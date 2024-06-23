@@ -114,21 +114,40 @@ dom.on('#filteringModeImage', 'click', async () => {
 
 
     });
-        let state = subscriptionStatus
+
+    const startTrialButton = document.getElementById('startTrialButton'); //but even after the user pays, there's going to be so maany unnecessary calls to this function
+    const subscribeButton = document.getElementById('subscribeButton'); //look into chrome storage to store the user's trial status
+    const trialCountdown = document.getElementById('trialCountdown');
+    let state = subscriptionStatus
 
         
     if (state === 'notStartedTrial') {
         setFilteringMode(0, true);
+        startTrialButton.style.display = 'block';
+        subscribeButton.style.display = 'none';
+        trialCountdown.style.display = 'none';
         extpay.openTrialPage('Start your 7-day free trial!');
         return;
     }
     else if (state === 'trialActive') {
+        startTrialButton.style.display = 'none';
+        subscribeButton.style.display = 'block';
+        trialCountdown.style.display = 'block';
+        updateTrialTime();
         setFilteringMode(newLevel, true);
+        
     }
     else if (state === 'trialExpired') {
+        startTrialButton.style.display = 'none';
+        subscribeButton.style.display = 'block';
+        trialCountdown.innerText = 'Free trial has expired';
+        trialCountdown.style.display = 'block';
         setFilteringMode(0, true);
         extpay.openPaymentPage('Please support the developer to continue using this amazing extension!');
     } else if (state === 'paidUser') {
+        startTrialButton.style.display = 'none';
+        subscribeButton.style.display = 'block';
+        trialCountdown.style.display = 'none';
         setFilteringMode(newLevel, true);
     } else {
         console.log('Unknown state');
@@ -172,6 +191,7 @@ async function updatePopup() { // you need to make this more efficient. this fun
                 startTrialButton.style.display = 'none';
                 subscribeButton.style.display = 'block';
                 trialCountdown.style.display = 'block';
+                updateTrialTime();
             } else if (subscriptionStatus === 'trialExpired') {
                 startTrialButton.style.display = 'none';
                 subscribeButton.style.display = 'block';
@@ -186,6 +206,23 @@ async function updatePopup() { // you need to make this more efficient. this fun
 
 }
 
+async function updateTrialTime() {
+    chrome.runtime.sendMessage({ checkSubscriptionStatus: true }, function(response) {
+        const trialCountdown = document.getElementById('trialCountdown');
+        if (response) {
+            const { secondsRemaining } = response;
+            const minutesRemaining = Math.floor(secondsRemaining / 60);
+            const seconds = secondsRemaining % 60;
+            trialCountdown.innerText = `Free trial time remaining: ${minutesRemaining}m ${seconds}s`;
+            trialCountdown.style.display = 'block';
+        } else {
+            console.error('No response received');
+            trialCountdown.innerText = 'Error retrieving trial time';
+            trialCountdown.style.display = 'block';
+        }
+    });
+}
+
 dom.on('#startTrialButton', 'click', async () => {
     await extpay.openTrialPage('Start your 7-day free trial!');
     await updatePopup();
@@ -196,6 +233,11 @@ dom.on('#subscribeButton', 'click', async () => {
     await updatePopup();
 
 });
+
+async function setOff() { 
+    setFilteringMode(0, true);
+}
+
 
 // Add a listener for messages from background.js
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -210,10 +252,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
         if (subscriptionStatus !== 'userPaid') {
         updatePopup();
+        updateButtonState();
         }
   
     }
+    // if (message.action === 'extensionInstalled') {
+    //     console.log('Extension installed successfully.');
+    //     setOff();
+    // }
 });
+
+
 
 async function init() {
     const [tab] = await browser.tabs.query({

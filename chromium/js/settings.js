@@ -247,7 +247,7 @@ function renderWidgets() {
 
 async function renderDefaultMode() {
     const savedMode = await localRead('defaultFilteringMode');
-    const defaultLevel = savedMode !== null ? parseInt(savedMode, 10) : 1; // Default to 'optimal'
+    const defaultLevel = savedMode !== null ? parseInt(savedMode, 10) : 0; // Default to 'optimal'
 
     if (defaultLevel === 0) {
         qs$(`.filteringModeCard input[type="radio"][value="0"]`).checked = true;
@@ -318,22 +318,46 @@ dom.on('#showBlockedCount input[type="checkbox"]', 'change', ev => {
 
 function renderTrustedSites() {
     const textarea = qs$('#trustedSites');
-    const hostnames = cachedRulesetData.trustedSites;
-    textarea.value = hostnames.map(hn => punycode.toUnicode(hn)).join('\n');
-    if ( textarea.value !== '' ) {
-        textarea.value += '\n';
-    }
+    // const hostnames = cachedRulesetData.trustedSites;
+    // textarea.value = hostnames.map(hn => punycode.toUnicode(hn)).join('\n');
+    // if ( textarea.value !== '' ) {
+    //     textarea.value += '\n';
+    // }    
+    
+    chrome.storage.local.get(['subscriptionStatus'], result => {
+        if (result.subscriptionStatus === 'trialExpired' || result.subscriptionStatus === 'notStartedTrial') {
+            textarea.disabled = true;
+            textarea.value = 'all-urls'
+        } else {
+            textarea.disabled = false;
+            const hostnames = cachedRulesetData.trustedSites;
+            textarea.value = hostnames.map(hn => punycode.toUnicode(hn)).join('\n');
+            if ( textarea.value !== '' ) {
+                textarea.value += '\n';
+            }    
+        }
+    });
 }
 
 function changeTrustedSites() {
     const hostnames = getStagedTrustedSites();
     const hash = hashFromIterable(cachedRulesetData.trustedSites);
-    if ( hashFromIterable(hostnames) === hash ) { return; }
-    sendMessage({
-        what: 'setTrustedSites',
-        hostnames,
+    if (hashFromIterable(hostnames) === hash) {
+        return;
+    }
+
+    chrome.storage.local.get(['subscriptionStatus'], result => {
+        if (result.subscriptionStatus === 'trialExpired' || result.subscriptionStatus === 'notStartedTrial') {
+            alert('Trial expired. Cannot set trusted sites.');
+        } else {
+            sendMessage({
+                what: 'setTrustedSites',
+                hostnames,
+            });
+        }
     });
 }
+
 
 function getStagedTrustedSites() {
     const textarea = qs$('#trustedSites');
@@ -435,7 +459,7 @@ localRead('hideUnusedFilterLists').then(value => {
 
 /******************************************************************************/
 
-const bc = new self.BroadcastChannel('uBOL');
+const bc = new self.BroadcastChannel('RedGuard');
 
 bc.onmessage = ev => {
     const message = ev.data;

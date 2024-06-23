@@ -205,19 +205,30 @@ function onMessage(request, sender, callback) {
         }
 
         case 'setFilteringMode': {
-            getFilteringMode(request.hostname).then(actualLevel => {
-                if (request.level === actualLevel) {
-                    return actualLevel;
+            chrome.storage.local.get(['subscriptionStatus'], result => {
+                if (result.subscriptionStatus === 'trialExpired' || result.subscriptionStatus === 'notStartedTrial') {
+                    setFilteringMode('all-urls',0);
+                } else {
+                    getFilteringMode(request.hostname).then(actualLevel => {
+                        if (request.level === actualLevel) {
+                            return actualLevel;
+                        }
+                        return setFilteringMode(request.hostname, request.level);
+                    }).then(actualLevel => {
+                        registerInjectables();
+                        callback(actualLevel);
+                    });
+                    return true;
                 }
-                return setFilteringMode(request.hostname, request.level);
-            }).then(actualLevel => {
-                registerInjectables();
-                callback(actualLevel);
-            });
-            return true;
-        }
+
+        });
+    }
 
         case 'setDefaultFilteringMode': {
+            chrome.storage.local.get(['subscriptionStatus'], result => {
+            if (result.subscriptionStatus === 'trialExpired' || result.subscriptionStatus === 'notStartedTrial') {
+                setDefaultFilteringMode(0);
+        } else {
             getDefaultFilteringMode().then(beforeLevel =>
                 setDefaultFilteringMode(request.level).then(afterLevel =>
                     ({ beforeLevel, afterLevel })
@@ -233,21 +244,32 @@ function onMessage(request, sender, callback) {
             });
             return true;
         }
+        })
+        }
 
         case 'setTrustedSites':
-            setTrustedSites(request.hostnames).then(() => {
-                registerInjectables();
-                return Promise.all([
-                    getDefaultFilteringMode(),
-                    getTrustedSites(),
-                ]);
-            }).then(results => {
-                callback({
-                    defaultFilteringMode: results[0],
-                    trustedSites: Array.from(results[1]),
-                });
+            chrome.storage.local.get(['subscriptionStatus'], result => {
+                if (result.subscriptionStatus === 'trialExpired' || result.subscriptionStatus === 'notStartedTrial') {
+                    callback({ success: false, message: 'Cannot set trusted sites.' });
+                    console.log('Cannot set trusted sites.');
+                } else {
+                    setTrustedSites(request.hostnames).then(() => {
+                        registerInjectables();
+                        return Promise.all([
+                            getDefaultFilteringMode(),
+                            getTrustedSites(),
+                        ]);
+                    }).then(results => {
+                        callback({
+                            defaultFilteringMode: results[0],
+                            trustedSites: Array.from(results[1]),
+                        });
+                    });
+                }
             });
             return true;
+
+        
 
         default:
             break;
@@ -298,62 +320,104 @@ async function start() {
     });
 
     if (firstRun) {
-        const disableFirstRunPage = await adminRead('disableFirstRunPage');
-        if (disableFirstRunPage !== true) {
-            runtime.openOptionsPage();
-        }
+        //const disableFirstRunPage = await adminRead('disableFirstRunPage');
+        // if (disableFirstRunPage !== true) {
+        //     runtime.openOptionsPage();
+        // }
         extpay.openTrialPage('Start your 7-day free trial!');
     }
 
 
     checkSubscriptionStatus(); // Check subscription status when the extension starts
+
+    //setOff(); // Set filtering mode to 0 for all tabs when the extension starts
+
+}
+
+async function setOff() {
+    if (subscriptionStatus === 'trialExpired' || subscriptionStatus === 'notStartedTrial') {
+            setFilteringMode('all-urls', 0).then(() => {
+                console.log(`Filtering mode set to 0 for ${tab.url}`);
+            }).catch((error) => {
+                console.error(`Failed to set filtering mode for ${tab.url}:`, error);
+            });
+    }
 }
 
 
 
-
-function checkSubscriptionStatus() {
-    extpay.getUser().then(user => {
+async function checkSubscriptionStatus() {
+    try {
+        const user = await extpay.getUser();
         const now = new Date();
 
+        let state;
+        let secondsRemaining = 0; // Initialize with a default value
+
         if (user.paid) {
-            console.log('paid user')
-            state='paidUser';
-            chrome.storage.local.set({ subscriptionStatus: state });
-            return;
-        }
-
-        if (!user.trialStartedAt) {
-            console.log('not started trial')
-            state='notStartedTrial'
-            chrome.storage.local.set({ subscriptionStatus: state });
-            return;
-        }
-
-        const trialEnd = new Date(user.trialStartedAt.getTime() + 1 * 60 * 1000); // 1 minute trial period
-//        const trialEnd = new Date(user.trialStartedAt.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 day trial period
-
-        if (now < trialEnd) {
-            console.log('Trial is still active')
-            state='trialActive'
-            chrome.storage.local.set({ subscriptionStatus: state });
-
+            console.log('paid user');
+            state = 'paidUser';
+        } else if (!user.trialStartedAt) {
+            console.log('not started trial');
+            state = 'notStartedTrial';
         } else {
-            console.log('Trial has expired')
-            state='trialExpired'
-            chrome.storage.local.set({ subscriptionStatus: state });
+            const trialEnd = new Date(user.trialStartedAt.getTime() + 1 * 60 * 1000); // 1 minute trial period 
+            const timeRemaining = trialEnd - now;
+
+            if (now < trialEnd) {
+                console.log('Trial is still active');
+                state = 'trialActive';
+                secondsRemaining = Math.max(0, Math.ceil(timeRemaining / 1000));
+            } else {
+                console.log('Trial has expired');
+                state = 'trialExpired';
+            }
         }
 
-
-    }).catch(error => {
+        // Set the subscription status and seconds remaining in storage
+        chrome.storage.local.set({ subscriptionStatus: state, secondsRemaining });
+    } catch (error) {
         console.error('Failed to get user info:', error);
+    }
+}
 
+chrome.webNavigation.onCompleted.addListener(async function(details) {
+    if (details.frameId === 0) {  // Ensure it's the main frame (top-level document)
+        console.log('Navigation completed for main frame:', details.url);
+
+        const subscriptionStatus = await new Promise(resolve => {
+            chrome.storage.local.get(['subscriptionStatus'], result => {
+                console.log('Subscription status retrieved:', result.subscriptionStatus);
+                resolve(result.subscriptionStatus || 'trialExpired');
+            });
+        });
+
+        console.log('Current subscription status:', subscriptionStatus);
+
+        if (subscriptionStatus === 'trialExpired' || subscriptionStatus === 'notStartedTrial') {
+            if (details.url) {
+                setFilteringMode(details.url, 0).then(() => {
+                    const logMessage = `Filtering mode set to 0 for ${details.url}`;
+                    console.log(logMessage);
+                    storeLogMessage(logMessage);
+                }).catch((error) => {
+                    const errorMessage = `Failed to set filtering mode for ${details.url}: ${error}`;
+                    console.error(errorMessage);
+                    storeLogMessage(errorMessage);
+                });
+            }
+        }
+    }
+});
+
+function storeLogMessage(message) {
+    chrome.storage.local.get(['logMessages'], result => {
+        const logMessages = result.logMessages || [];
+        logMessages.push(message);
+        chrome.storage.local.set({ logMessages });
     });
 }
 
-chrome.tabs.onCreated.addListener(function(tab) {
-    chrome.runtime.sendMessage({ action: 'update' });
-    });
 
 try {
     start();
@@ -361,16 +425,24 @@ try {
     console.trace(reason);
 }
 
-
+// chrome.runtime.onInstalled.addListener((details) => {
+//     if (details.reason === 'install') {
+//         chrome.runtime.sendMessage({ action: 'extensionInstalled' });
+//     }
+// });
 
 // Check trial status on any extension interaction
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.checkSubscriptionStatus) {
-        checkSubscriptionStatus();
-        chrome.storage.local.get(['subscriptionStatus'], result => {
-            sendResponse(result.subscriptionStatus || 'trialExpired');
+        checkSubscriptionStatus().then(() => {
+            chrome.storage.local.get(['subscriptionStatus', 'secondsRemaining'], result => {
+                sendResponse({
+                    subscriptionStatus: result.subscriptionStatus || 'trialExpired',
+                    secondsRemaining: result.secondsRemaining || 0
+                });
+            });
         });
+        return true;
     }
-
 });
 

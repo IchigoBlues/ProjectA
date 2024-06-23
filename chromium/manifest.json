@@ -247,6 +247,7 @@
     "<all_urls>"
   ],
   "permissions": [
+    "webNavigation",
     "activeTab",
     "tabs",
     "declarativeNetRequest",
